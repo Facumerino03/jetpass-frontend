@@ -50,3 +50,6 @@ app-example
 
 # vscode workspace files
 jetpass-frontend.code-workspace
+
+.superpowers/
+docs/

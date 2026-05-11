@@ -22,6 +22,7 @@
 ### Task 1: Initialize Expo Project
 
 **Files:**
+
 - Create: Expo template files in repository root
 
 - [ ] **Step 1: Create Expo project in root**
@@ -35,6 +36,7 @@ Verify `package.json`, `app.json`, `tsconfig.json`, and route files exist.
 ### Task 2: Configure Recommended Source Layout
 
 **Files:**
+
 - Create/Modify: `src/app/_layout.tsx`
 - Create/Modify: `src/app/index.tsx`
 - Create: `src/screens/home/index.tsx`
@@ -50,6 +52,7 @@ Implement `src/app/index.tsx` so it imports and renders `HomeScreen` from `src/s
 ### Task 3: Install and Configure Styling and Components
 
 **Files:**
+
 - Modify: `package.json`
 - Modify/Create: `tailwind.config.js`, `babel.config.js`, `metro.config.js`, `src/global.css`, `nativewind-env.d.ts`
 - Create: `src/components/ui/button.tsx`, `src/components/ui/card.tsx`, `src/components/ui/text.tsx`
@@ -70,6 +73,7 @@ Use the React Native Reusables CLI to add `button`, `card`, and `text` under `sr
 ### Task 4: Add Verification Home Screen
 
 **Files:**
+
 - Modify: `src/screens/home/index.tsx`
 - Modify: `src/app/index.tsx`
 
@@ -84,6 +88,7 @@ Use a scrollable root or safe-area-aware layout so the initial screen works on s
 ### Task 5: Verify Project
 
 **Files:**
+
 - No source edits expected unless verification reveals issues
 
 - [ ] **Step 1: Run package scripts**
