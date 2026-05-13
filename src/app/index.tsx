@@ -1,6 +1,4 @@
-import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { useRouter } from "expo-router";
 
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/features/auth/auth-context";
@@ -8,13 +6,6 @@ import { AuthScreen } from "@/screens/auth";
 
 export default function IndexRoute() {
   const { isLoading, session } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading && session) {
-      router.replace("/(tabs)");
-    }
-  }, [isLoading, session, router]);
 
   if (isLoading) {
     return (
@@ -29,9 +20,5 @@ export default function IndexRoute() {
     return <AuthScreen />;
   }
 
-  return (
-    <View className="flex-1 items-center justify-center bg-background">
-      <ActivityIndicator />
-    </View>
-  );
+  return null;
 }

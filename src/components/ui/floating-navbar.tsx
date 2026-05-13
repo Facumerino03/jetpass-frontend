@@ -4,10 +4,13 @@ import {
   List,
   MoreHorizontal,
   Plus,
+  TicketsPlane,
 } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import type { Href } from "expo-router";
 
 interface TabBarProps {
   state: any;
@@ -15,75 +18,47 @@ interface TabBarProps {
   navigation: any;
 }
 
+const TAB_CONFIG: Record<string, { label: string; icon: typeof Home }> = {
+  index: { label: "Inicio", icon: Home },
+  aircraft: { label: "Aeronaves", icon: Plane },
+  plans: { label: "Planes", icon: List },
+  more: { label: "Más", icon: MoreHorizontal },
+};
+
+const FAB_CONFIG: Record<string, { href: Href; visible: boolean; icon?: typeof Home } | undefined> = {
+  index: { href: "/create-fpl", visible: true, icon: TicketsPlane },
+  aircraft: { href: "/aircraft/create", visible: true, icon: Plus },
+  plans: { href: "/", visible: false },
+  more: { href: "/", visible: false },
+};
+
 export default function FloatingNavbar({
   state,
   descriptors,
   navigation,
 }: TabBarProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
-  const tabColors = {
-    index: { background: "#f4f4f5", icon: "#09090b" },
-    aircraft: { background: "#f4f4f5", icon: "#09090b" },
-    plans: { background: "#f4f4f5", icon: "#09090b" },
-    more: { background: "#f4f4f5", icon: "#09090b" },
-    "create-fpl": { background: "#09090b", icon: "#ffffff" },
-  };
+  const activeRouteName = state.routes[state.index]?.name as string;
+  const fabConfig = FAB_CONFIG[activeRouteName];
 
-  const getIcon = (routeName: string, color: string) => {
-    const isCreate = routeName === "create-fpl";
-    const iconProps = { 
-      size: isCreate ? 30 : 24, 
-      color,
-      strokeWidth: isCreate ? 2.5 : 2 
-    };
-
-    switch (routeName) {
-      case "index":
-        return <Home {...iconProps} />;
-      case "aircraft":
-        return <Plane {...iconProps} />;
-      case "plans":
-        return <List {...iconProps} />;
-      case "more":
-        return <MoreHorizontal {...iconProps} />;
-      case "create-fpl":
-        return <Plus {...iconProps} />;
-      default:
-        return <Home {...iconProps} />;
+  const handleFabPress = () => {
+    if (fabConfig?.visible && fabConfig.href) {
+      router.push(fabConfig.href);
     }
   };
-
-  const getTabStyle = (routeName: string, isFocused: boolean) => {
-    const routeColors = tabColors[routeName as keyof typeof tabColors] || tabColors.index;
-    
-    if (routeName === 'create-fpl') {
-      return {
-        backgroundColor: routeColors.background,
-      };
-    }
-    
-    return isFocused ? { backgroundColor: routeColors.background } : {};
-  };
-
-  const getIconColor = (routeName: string, isFocused: boolean) => {
-    const routeColors = tabColors[routeName as keyof typeof tabColors] || tabColors.index;
-    
-    if (routeName === 'create-fpl') {
-      return routeColors.icon;
-    }
-    
-    return isFocused ? routeColors.icon : "#09090b";
-  };
-
-  const mainRoutes = state.routes.filter((route: any) => route.name !== "create-fpl");
-  const createFplRoute = state.routes.find((route: any) => route.name === "create-fpl");
 
   return (
     <View style={[styles.wrapper, { bottom: insets.bottom + 20 }]}>
       <View style={styles.mainContainer}>
-        {mainRoutes.map((route: any, index: number) => {
-          const isFocused = state.index === state.routes.indexOf(route);
+        {state.routes.map((route: any, index: number) => {
+          const isFocused = state.index === index;
+          const config = TAB_CONFIG[route.name];
+
+          if (!config) return null;
+
+          const Icon = config.icon;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -99,39 +74,33 @@ export default function FloatingNavbar({
 
           return (
             <TouchableOpacity
-              key={index}
+              key={route.key}
               onPress={onPress}
               style={[
                 styles.tab,
-                getTabStyle(route.name, isFocused)
+                isFocused && { backgroundColor: "#f4f4f5" },
               ]}
             >
-              {getIcon(route.name, getIconColor(route.name, isFocused))}
+              <Icon
+                size={24}
+                color={isFocused ? "#09090b" : "#09090b"}
+                strokeWidth={isFocused ? 2.2 : 2.2}
+              />
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {createFplRoute && (
+      {fabConfig?.visible && (
         <TouchableOpacity
-          onPress={() => {
-            const event = navigation.emit({
-              type: "tabPress",
-              target: createFplRoute.key,
-              canPreventDefault: true,
-            });
-
-            const isFocused = state.index === state.routes.indexOf(createFplRoute);
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(createFplRoute.name);
-            }
-          }}
+          onPress={handleFabPress}
+          activeOpacity={0.8}
           style={styles.fab}
         >
-          {getIcon(
-            "create-fpl",
-            getIconColor("create-fpl", state.index === state.routes.indexOf(createFplRoute))
-          )}
+          {(() => {
+            const FabIcon = fabConfig.icon ?? Plus;
+            return <FabIcon size={28} color="#ffffff" strokeWidth={2.2} />;
+          })()}
         </TouchableOpacity>
       )}
     </View>
@@ -142,7 +111,7 @@ const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
     flexDirection: "row",
-    alignItems: "flex-end", // Aligns the bottoms so the FAB can stick out from the top
+    alignItems: "flex-end",
     justifyContent: "center",
     alignSelf: "center",
     marginHorizontal: 20,

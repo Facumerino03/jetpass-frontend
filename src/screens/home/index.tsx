@@ -48,7 +48,11 @@ export function HomeScreen() {
           </Text>
         </CardContent>
         <CardFooter>
-          <Button className="w-full" variant="outline" onPress={logout}>
+          <Button
+            className="w-full"
+            variant="outline"
+            onPress={logout}
+          >
             <Text>Cerrar sesion</Text>
           </Button>
         </CardFooter>

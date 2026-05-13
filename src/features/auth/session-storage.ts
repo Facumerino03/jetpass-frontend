@@ -60,5 +60,10 @@ export async function writeStoredSession(session: AuthSession) {
 }
 
 export async function clearStoredSession() {
-  await setStorageItem(AUTH_SESSION_KEY, null);
+  try {
+    await setStorageItem(AUTH_SESSION_KEY, null);
+  } catch (error) {
+    console.error("[Auth] Error clearing session:", error);
+    throw error;
+  }
 }
