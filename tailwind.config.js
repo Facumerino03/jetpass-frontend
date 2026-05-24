@@ -45,7 +45,26 @@ module.exports = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        sans: ["Geist-Regular", "system-ui", "sans-serif"],
+        mono: ["GeistMono-Regular", "monospace"],
+      },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    function ({ addUtilities }) {
+      addUtilities({
+        ".font-thin": { fontFamily: "Geist-Regular" },
+        ".font-extralight": { fontFamily: "Geist-Regular" },
+        ".font-light": { fontFamily: "Geist-Regular" },
+        ".font-normal": { fontFamily: "Geist-Regular" },
+        ".font-medium": { fontFamily: "Geist-Medium" },
+        ".font-semibold": { fontFamily: "Geist-SemiBold" },
+        ".font-bold": { fontFamily: "Geist-Bold" },
+        ".font-extrabold": { fontFamily: "Geist-Bold" },
+        ".font-black": { fontFamily: "Geist-Bold" },
+      });
+    },
+  ],
 };

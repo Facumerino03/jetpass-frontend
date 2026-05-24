@@ -3,6 +3,14 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-family: "Geist-Regular", system-ui, sans-serif;
+  }
+
+  text {
+    font-family: Geist-Regular;
+  }
+
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;

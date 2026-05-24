@@ -1,57 +1,107 @@
 import * as React from "react";
-import { View, FlatList, RefreshControl, Pressable } from "react-native";
+import { View, FlatList, RefreshControl, Pressable, StyleSheet } from "react-native";
 import { router, type Href } from "expo-router";
+import { Image } from "expo-image";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import Header from "@/components/header";
 import { useAuth } from "@/features/auth/auth-context";
 import { listAircraft, deleteAircraft } from "@/features/aircraft/aircraft-api";
 import type { AircraftPublic } from "@/features/aircraft/types";
 import { getErrorMessage } from "@/lib/api";
-import { Plane, ChevronRight, Trash2 } from "lucide-react-native";
+import { Plane, ArrowUpRight, Heart, Hash, Wind } from "lucide-react-native";
 import { Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function AircraftCard({
   aircraft,
   onPress,
-  onDelete,
 }: {
   aircraft: AircraftPublic;
   onPress: () => void;
-  onDelete: () => void;
 }) {
+  const hasImage = !!aircraft.image_url;
+
   return (
-    <Pressable onPress={onPress} className="active:opacity-80">
-      <Card className="flex-row items-center justify-between">
-        <CardContent className="flex-1 flex-row items-center gap-3 py-4">
-          <View className="bg-primary/10 h-10 w-10 items-center justify-center rounded-full">
-            <Plane className="text-primary size-5" />
+    <Pressable onPress={onPress} className="active:opacity-95">
+      <View style={styles.card}>
+        {/* Top Content Area */}
+        <View className="p-5 pb-7 pt-6">
+          {/* Header: Title + Arrow Button */}
+          <View className="flex-row justify-between items-start">
+            <View className="flex-1 pr-3">
+              {/* Title Row with inline tag */}
+              <View className="flex-row items-baseline gap-2">
+                <Text className="text-2xl font-bold text-zinc-900" numberOfLines={1}>
+                  {aircraft.alias ?? aircraft.identification}
+                </Text>
+                <Text className="text-sm text-zinc-500" numberOfLines={1}>
+                  {aircraft.icao_type_designator}
+                </Text>
+              </View>
+            </View>
+
+            {/* Black Arrow Button */}
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                onPress();
+              }}
+              className="h-11 w-11 bg-zinc-900 rounded-full items-center justify-center active:bg-zinc-700"
+            >
+              <ArrowUpRight size={20} color="#ffffff" />
+            </Pressable>
           </View>
-          <View className="flex-1">
-            <Text className="text-foreground font-semibold text-base">
-              {aircraft.alias ?? aircraft.identification}
-            </Text>
-            <Text className="text-muted-foreground text-sm">
-              {aircraft.identification} · {aircraft.icao_type_designator} · {aircraft.wake_turbulence_category}
-            </Text>
+
+          {/* Pills Row */}
+          <View className="flex-row flex-wrap gap-2">
+            {/* Identification Pill - Amber */}
+            <View className="bg-amber-50 rounded-full px-2.5 py-1.5 flex-row items-center gap-1 border border-amber-100">
+              <Hash size={12} color="#f59e0b" />
+              <Text className="text-xs font-medium text-amber-700">
+                {aircraft.identification}
+              </Text>
+            </View>
+            {/* ICAO Type Pill - Sky */}
+            <View className="bg-sky-50 rounded-full px-2.5 py-1.5 flex-row items-center gap-1 border border-sky-100">
+              <Plane size={12} color="#0ea5e9" />
+              <Text className="text-xs font-medium text-sky-700">
+                {aircraft.icao_type_designator}
+              </Text>
+            </View>
+            {/* Wake Turbulence Pill - Emerald */}
+            <View className="bg-emerald-50 rounded-full px-2.5 py-1.5 flex-row items-center gap-1 border border-emerald-100">
+              <Wind size={12} color="#10b981" />
+              <Text className="text-xs font-medium text-emerald-700">
+                {aircraft.wake_turbulence_category}
+              </Text>
+            </View>
           </View>
-        </CardContent>
-        <View className="flex-row items-center gap-2 pr-4">
-          <Pressable
-            onPress={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="h-8 w-8 items-center justify-center rounded-full active:bg-destructive/10"
-            hitSlop={8}
-          >
-            <Trash2 className="text-destructive size-4" />
-          </Pressable>
-          <ChevronRight className="text-muted-foreground size-4" />
         </View>
-      </Card>
+
+        {/* Bottom Image Area */}
+        <View className="px-0 pb-0">
+          <View style={styles.imageWrapper}>
+            {hasImage ? (
+              <Image
+                source={{ uri: aircraft.image_url! }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={300}
+              />
+            ) : (
+              <View className="flex-1 items-center justify-center bg-zinc-100">
+                <Plane size={48} color="#a1a1aa" strokeWidth={1.5} />
+              </View>
+            )}
+
+            {/* Favorite Badge - Bottom Left of Image */}
+            <View className="absolute bottom-3 left-3 h-8 w-8 items-center justify-center rounded-full bg-white/90">
+              <Heart size={16} color="#ef4444" fill="#ef4444" />
+            </View>
+          </View>
+        </View>
+      </View>
     </Pressable>
   );
 }
@@ -169,7 +219,7 @@ export default function AircraftListScreen() {
         <FlatList
           data={aircraft}
           keyExtractor={(item) => item.id}
-          contentContainerClassName="gap-3 px-4 py-4"
+          contentContainerClassName="gap-4 px-4 py-4"
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={refresh} />
           }
@@ -177,7 +227,6 @@ export default function AircraftListScreen() {
             <AircraftCard
               aircraft={item}
               onPress={() => router.push(`/aircraft/${item.id}` as Href)}
-              onDelete={() => handleDelete(item)}
             />
           )}
         />
@@ -188,3 +237,20 @@ export default function AircraftListScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#e4e4e7",
+  },
+  imageWrapper: {
+    height: 220,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: "#f3f4f6",
+    position: "relative",
+  },
+});

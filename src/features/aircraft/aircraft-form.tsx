@@ -1,15 +1,23 @@
 import * as React from "react";
-import { View, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, ScrollView, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { Text } from "@/components/ui/text";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { CheckboxGroup } from "@/components/ui/checkbox-group";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AircraftCreate, AircraftUpdate, WakeTurbulenceCat } from "./types";
 import { WAKE_TURBULENCE_OPTIONS } from "./types";
+import {
+  Plane,
+  Hash,
+  Fingerprint,
+  Radio,
+  ShieldCheck,
+  Anchor,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react-native";
 
 /* ─────────────────── Multi-select options ─────────────────── */
 
@@ -104,6 +112,7 @@ export type AircraftFormData = {
   dinghies_capacity: string;
   dinghies_cover: boolean;
   dinghies_color: string;
+  image_url: string;
 };
 
 interface AircraftFormProps {
@@ -139,6 +148,7 @@ function toFormData(partial?: Partial<AircraftFormData>): AircraftFormData {
     dinghies_capacity: partial?.dinghies_capacity?.toString() ?? "",
     dinghies_cover: partial?.dinghies_cover ?? false,
     dinghies_color: partial?.dinghies_color ?? "",
+    image_url: partial?.image_url ?? "",
   };
 }
 
@@ -168,10 +178,305 @@ function fromFormData(data: AircraftFormData): AircraftCreate {
           dinghies_cover: false,
           dinghies_color: null,
         }),
+    image_url: data.image_url.trim() || null,
   };
 }
 
-function FieldRow({
+/* ─────────────────── Steps config ─────────────────── */
+
+const TOTAL_STEPS = 5;
+
+interface StepConfig {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  iconColor: string;
+}
+
+const STEPS: StepConfig[] = [
+  {
+    title: "Identificá tu aeronave",
+    description: "Comenzá con los datos principales de identificación.",
+    icon: Fingerprint,
+    iconColor: "#0ea5e9",
+  },
+  {
+    title: "Tipo y características",
+    description: "Indicá el modelo, turbulencia de estela y colores.",
+    icon: Hash,
+    iconColor: "#f59e0b",
+  },
+  {
+    title: "Equipamiento",
+    description: "Seleccioná el equipamiento de comunicación y vigilancia.",
+    icon: Radio,
+    iconColor: "#10b981",
+  },
+  {
+    title: "Capacidades adicionales",
+    description: "Agregá PBN, equipos de emergencia y supervivencia.",
+    icon: ShieldCheck,
+    iconColor: "#e11d48",
+  },
+  {
+    title: "Últimos detalles",
+    description: "Foto opcional y botes salvavidas.",
+    icon: Anchor,
+    iconColor: "#0891b2",
+  },
+];
+
+/* ─────────────────── UI Helpers ─────────────────── */
+
+/* ─── Helpers for multi-select components ─── */
+
+function parseValue(value: string): string[] {
+  if (!value.trim()) return [];
+  const trimmed = value.trim();
+  if (trimmed.includes(",")) {
+    return trimmed.split(",").map((v) => v.trim()).filter(Boolean);
+  }
+  if (trimmed.includes(" ")) {
+    return trimmed.split(/\s+/).map((v) => v.trim()).filter(Boolean);
+  }
+  return [trimmed];
+}
+
+function serializeValue(selected: string[]): string {
+  return selected.join(", ");
+}
+
+/* ─── Selectable Pills (fixed options, toggle on/off) ─── */
+
+interface SelectablePillsProps {
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (value: string) => void;
+}
+
+function SelectablePills({ value, options, onChange }: SelectablePillsProps) {
+  const selected = React.useMemo(() => parseValue(value), [value]);
+
+  const toggle = React.useCallback(
+    (optionValue: string) => {
+      const next = selected.includes(optionValue)
+        ? selected.filter((v) => v !== optionValue)
+        : [...selected, optionValue];
+      onChange(serializeValue(next));
+    },
+    [selected, onChange],
+  );
+
+  return (
+    <View className="flex-row flex-wrap gap-2">
+      {options.map((option) => {
+        const isSelected = selected.includes(option.value);
+        return (
+          <Pressable
+            key={option.value}
+            onPress={() => toggle(option.value)}
+            className={`rounded-full px-4 py-2.5 border ${
+              isSelected
+                ? "bg-zinc-900 border-zinc-900"
+                : "bg-white border-zinc-200"
+            }`}
+          >
+            <Text
+              className={`text-sm font-medium ${
+                isSelected ? "text-white" : "text-zinc-600"
+              }`}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ─── Tag Input (free-form chips with suggestions) ─── */
+
+interface TagInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  suggestions?: { label: string; value: string }[];
+  placeholder?: string;
+}
+
+function TagInput({ value, onChange, suggestions = [], placeholder = "Escribí el código y tocá +" }: TagInputProps) {
+  const [inputText, setInputText] = React.useState("");
+  const tags = React.useMemo(() => parseValue(value), [value]);
+
+  const addTag = React.useCallback((text: string) => {
+    const trimmed = text.trim().toUpperCase();
+    if (!trimmed) return;
+    const next = tags.includes(trimmed) ? tags : [...tags, trimmed];
+    onChange(serializeValue(next));
+    setInputText("");
+  }, [tags, onChange]);
+
+  const removeTag = React.useCallback((tag: string) => {
+    onChange(serializeValue(tags.filter((t) => t !== tag)));
+  }, [tags, onChange]);
+
+  return (
+    <View className="gap-3">
+      {/* Existing tags */}
+      {tags.length > 0 && (
+        <View className="flex-row flex-wrap gap-2">
+          {tags.map((tag) => (
+            <View
+              key={tag}
+              className="flex-row items-center gap-1 bg-zinc-900 rounded-full px-3 py-1.5"
+            >
+              <Text className="text-sm font-medium text-white">{tag}</Text>
+              <Pressable onPress={() => removeTag(tag)} hitSlop={4}>
+                <Text className="text-white text-xs ml-0.5">✕</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Input row */}
+      <View className="flex-row items-center gap-2">
+        <Input
+          value={inputText}
+          onChangeText={setInputText}
+          onSubmitEditing={() => addTag(inputText)}
+          placeholder={placeholder}
+          className="flex-1 bg-zinc-50 rounded-2xl border-zinc-200 h-12"
+          autoCapitalize="characters"
+          maxLength={10}
+        />
+        <Pressable
+          onPress={() => addTag(inputText)}
+          disabled={!inputText.trim()}
+          className={`h-12 w-12 items-center justify-center rounded-2xl ${
+            inputText.trim() ? "bg-zinc-900 active:bg-zinc-700" : "bg-zinc-200"
+          }`}
+        >
+          <Text className={`font-bold text-lg ${inputText.trim() ? "text-white" : "text-zinc-400"}`}>
+            +
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Quick suggestions */}
+      {suggestions.length > 0 && (
+        <View className="gap-2">
+          <Text className="text-xs text-zinc-400">Sugerencias rápidas</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {suggestions.map((s) => (
+              <Pressable
+                key={s.value}
+                onPress={() => addTag(s.value)}
+                className="rounded-full px-3 py-1.5 bg-white border border-zinc-200 active:bg-zinc-50"
+              >
+                <Text className="text-xs text-zinc-600">{s.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* ─── Stepper Control (+ / -) for numeric values ─── */
+
+interface StepperControlProps {
+  value: string;
+  onChange: (value: string) => void;
+  min?: number;
+  max?: number;
+}
+
+function StepperControl({ value, onChange, min = 0, max = 999 }: StepperControlProps) {
+  const numValue = parseInt(value, 10) || 0;
+
+  const decrement = React.useCallback(() => {
+    if (numValue > min) {
+      onChange((numValue - 1).toString());
+    }
+  }, [numValue, min, onChange]);
+
+  const increment = React.useCallback(() => {
+    if (numValue < max) {
+      onChange((numValue + 1).toString());
+    }
+  }, [numValue, max, onChange]);
+
+  return (
+    <View className="flex-row items-center gap-3">
+      <Pressable
+        onPress={decrement}
+        disabled={numValue <= min}
+        className={`h-12 w-12 items-center justify-center rounded-2xl ${
+          numValue > min ? "bg-zinc-100 active:bg-zinc-200" : "bg-zinc-100 opacity-40"
+        }`}
+      >
+        <Text className={`text-xl font-bold ${numValue > min ? "text-zinc-900" : "text-zinc-400"}`}>
+          −
+        </Text>
+      </Pressable>
+
+      <View className="flex-1 h-12 items-center justify-center bg-zinc-50 rounded-2xl border border-zinc-200">
+        <Text className="text-lg font-semibold text-zinc-900">{numValue}</Text>
+      </View>
+
+      <Pressable
+        onPress={increment}
+        disabled={numValue >= max}
+        className={`h-12 w-12 items-center justify-center rounded-2xl ${
+          numValue < max ? "bg-zinc-900 active:bg-zinc-700" : "bg-zinc-200"
+        }`}
+      >
+        <Text className={`text-xl font-bold ${numValue < max ? "text-white" : "text-zinc-400"}`}>
+          +
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function StepIndicator({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) {
+  return (
+    <View className="px-4 mb-6">
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="text-sm font-medium text-zinc-400">
+          Paso {currentStep} / {totalSteps}
+        </Text>
+      </View>
+      <View className="flex-row gap-2">
+        {Array.from({ length: totalSteps }).map((_, i) => (
+          <View
+            key={i}
+            className={`flex-1 h-1 rounded-full ${
+              i + 1 <= currentStep ? "bg-zinc-900" : "bg-zinc-200"
+            }`}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function StepHeader({ step }: { step: StepConfig }) {
+  const Icon = step.icon;
+  return (
+    <View className="px-4 mb-8">
+      <View className="h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 mb-4">
+        <Icon size={24} color={step.iconColor} />
+      </View>
+      <Text className="text-2xl font-bold text-zinc-900 mb-1">{step.title}</Text>
+      <Text className="text-sm text-zinc-500">{step.description}</Text>
+    </View>
+  );
+}
+
+function FieldWrapper({
   label,
   children,
   required,
@@ -182,9 +487,9 @@ function FieldRow({
 }) {
   return (
     <View className="gap-2">
-      <Label>
+      <Label className="text-sm text-zinc-500">
         {label}
-        {required && <Text className="text-destructive"> *</Text>}
+        {required && <Text className="text-red-500"> *</Text>}
       </Label>
       {children}
     </View>
@@ -195,6 +500,7 @@ function FieldRow({
 
 export function AircraftForm({ initialData, onSubmit, submitLabel, isLoading }: AircraftFormProps) {
   const [form, setForm] = React.useState<AircraftFormData>(() => toFormData(initialData));
+  const [step, setStep] = React.useState(1);
 
   const updateField = React.useCallback(<K extends keyof AircraftFormData>(
     field: K,
@@ -207,12 +513,42 @@ export function AircraftForm({ initialData, onSubmit, submitLabel, isLoading }: 
     onSubmit(fromFormData(form));
   }, [form, onSubmit]);
 
-  const isValid =
-    form.identification.trim().length >= 1 &&
-    form.icao_type_designator.trim().length >= 1 &&
-    form.equipment_com_nav.trim().length >= 1 &&
-    form.equipment_surveillance.trim().length >= 1 &&
-    form.color_and_markings.trim().length >= 1;
+  const isStepValid = React.useMemo(() => {
+    switch (step) {
+      case 1:
+        return form.identification.trim().length >= 1;
+      case 2:
+        return (
+          form.icao_type_designator.trim().length >= 1 &&
+          form.color_and_markings.trim().length >= 1
+        );
+      case 3:
+        return (
+          form.equipment_com_nav.trim().length >= 1 &&
+          form.equipment_surveillance.trim().length >= 1
+        );
+      case 4:
+        return true; // all optional
+      case 5:
+        return true;
+      default:
+        return false;
+    }
+  }, [step, form]);
+
+  const goNext = React.useCallback(() => {
+    if (step < TOTAL_STEPS) {
+      setStep((s) => s + 1);
+    } else {
+      handleSubmit();
+    }
+  }, [step, handleSubmit]);
+
+  const goBack = React.useCallback(() => {
+    if (step > 1) setStep((s) => s - 1);
+  }, [step]);
+
+  const stepConfig = STEPS[step - 1];
 
   return (
     <KeyboardAvoidingView
@@ -222,203 +558,251 @@ export function AircraftForm({ initialData, onSubmit, submitLabel, isLoading }: 
     >
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 p-4 pb-8"
+        contentContainerClassName="pb-8"
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Información básica ── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Información básica</CardTitle>
-          </CardHeader>
-          <CardContent className="gap-4">
-            <FieldRow label="Identificación" required>
-              <Input
-                value={form.identification}
-                onChangeText={(text) => updateField("identification", text)}
-                placeholder="Ej: LV-ABC"
-                autoCapitalize="characters"
-                maxLength={20}
-              />
-            </FieldRow>
+        {/* Step Indicator */}
+        <StepIndicator currentStep={step} totalSteps={TOTAL_STEPS} />
 
-            <FieldRow label="Alias" required={false}>
-              <Input
-                value={form.alias}
-                onChangeText={(text) => updateField("alias", text)}
-                placeholder="Nombre descriptivo (opcional)"
-                maxLength={120}
-              />
-            </FieldRow>
+        {/* Step Header */}
+        <StepHeader step={stepConfig} />
 
-            <FieldRow label="Designador ICAO" required>
-              <Input
-                value={form.icao_type_designator}
-                onChangeText={(text) => updateField("icao_type_designator", text)}
-                placeholder="Ej: C172"
-                autoCapitalize="characters"
-                maxLength={10}
-              />
-            </FieldRow>
+        {/* Step Content */}
+        <View className="px-4 gap-5">
+          {step === 1 && (
+            <>
+              <FieldWrapper label="Identificación" required>
+                <Input
+                  value={form.identification}
+                  onChangeText={(text) => updateField("identification", text)}
+                  placeholder="Ej: LV-ABC"
+                  autoCapitalize="characters"
+                  maxLength={20}
+                  className="bg-zinc-50 rounded-2xl border-zinc-200 h-14"
+                />
+              </FieldWrapper>
 
-            <FieldRow label="Categoría de turbulencia" required>
-              <Select
-                value={form.wake_turbulence_category}
-                options={WAKE_TURBULENCE_OPTIONS}
-                onChange={(value) => updateField("wake_turbulence_category", value as WakeTurbulenceCat)}
-              />
-            </FieldRow>
+              <FieldWrapper label="Alias" required={false}>
+                <Input
+                  value={form.alias}
+                  onChangeText={(text) => updateField("alias", text)}
+                  placeholder="Nombre descriptivo (opcional)"
+                  maxLength={120}
+                  className="bg-zinc-50 rounded-2xl border-zinc-200 h-14"
+                />
+              </FieldWrapper>
+            </>
+          )}
 
-            <FieldRow label="Colores y marcas" required>
-              <Input
-                value={form.color_and_markings}
-                onChangeText={(text) => updateField("color_and_markings", text)}
-                placeholder="Ej: Blanco con franjas azules"
-                maxLength={255}
-              />
-            </FieldRow>
-          </CardContent>
-        </Card>
+          {step === 2 && (
+            <>
+              <FieldWrapper label="Designador ICAO" required>
+                <Input
+                  value={form.icao_type_designator}
+                  onChangeText={(text) => updateField("icao_type_designator", text)}
+                  placeholder="Ej: C172"
+                  autoCapitalize="characters"
+                  maxLength={10}
+                  className="bg-zinc-50 rounded-2xl border-zinc-200 h-14"
+                />
+              </FieldWrapper>
 
-        {/* ── Equipamiento COM/NAV ── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Equipamiento COM/NAV</CardTitle>
-          </CardHeader>
-          <CardContent className="gap-4">
-            <FieldRow label="COM/NAV" required>
-              <CheckboxGroup
-                value={form.equipment_com_nav}
-                options={COM_NAV_OPTIONS}
-                onChange={(value) => updateField("equipment_com_nav", value)}
-              />
-            </FieldRow>
-          </CardContent>
-        </Card>
+              <FieldWrapper label="Categoría de turbulencia" required>
+                <Select
+                  value={form.wake_turbulence_category}
+                  options={WAKE_TURBULENCE_OPTIONS}
+                  onChange={(value) => updateField("wake_turbulence_category", value as WakeTurbulenceCat)}
+                />
+              </FieldWrapper>
 
-        {/* ── Equipamiento de vigilancia ── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Equipamiento de vigilancia</CardTitle>
-          </CardHeader>
-          <CardContent className="gap-4">
-            <FieldRow label="Vigilancia" required>
-              <CheckboxGroup
-                value={form.equipment_surveillance}
-                options={SURVEILLANCE_OPTIONS}
-                onChange={(value) => updateField("equipment_surveillance", value)}
-              />
-            </FieldRow>
-          </CardContent>
-        </Card>
+              <FieldWrapper label="Colores y marcas" required>
+                <Input
+                  value={form.color_and_markings}
+                  onChangeText={(text) => updateField("color_and_markings", text)}
+                  placeholder="Ej: Blanco con franjas azules"
+                  maxLength={255}
+                  className="bg-zinc-50 rounded-2xl border-zinc-200 h-14"
+                />
+              </FieldWrapper>
+            </>
+          )}
 
-        {/* ── Capacidades PBN ── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Capacidades PBN</CardTitle>
-          </CardHeader>
-          <CardContent className="gap-4">
-            <FieldRow label="PBN" required={false}>
-              <CheckboxGroup
-                value={form.pbn_capabilities}
-                options={PBN_OPTIONS}
-                onChange={(value) => updateField("pbn_capabilities", value)}
-              />
-            </FieldRow>
-          </CardContent>
-        </Card>
+          {step === 3 && (
+            <>
+              <FieldWrapper label="Equipamiento COM/NAV" required>
+                <TagInput
+                  value={form.equipment_com_nav}
+                  onChange={(value) => updateField("equipment_com_nav", value)}
+                  suggestions={[
+                    { label: "S — Standard", value: "S" },
+                    { label: "D — DME", value: "D" },
+                    { label: "F — ADF", value: "F" },
+                    { label: "G — GNSS", value: "G" },
+                    { label: "W — RVSM", value: "W" },
+                    { label: "Y — 8.33kHz", value: "Y" },
+                  ]}
+                  placeholder="Ej: S, D, F, G..."
+                />
+              </FieldWrapper>
 
-        {/* ── Equipamiento de emergencia ── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Equipamiento de emergencia</CardTitle>
-          </CardHeader>
-          <CardContent className="gap-4">
-            <FieldRow label="Radio de emergencia" required={false}>
-              <CheckboxGroup
-                value={form.emergency_radio}
-                options={EMERGENCY_RADIO_OPTIONS}
-                onChange={(value) => updateField("emergency_radio", value)}
-              />
-            </FieldRow>
+              <FieldWrapper label="Equipamiento de vigilancia" required>
+                <TagInput
+                  value={form.equipment_surveillance}
+                  onChange={(value) => updateField("equipment_surveillance", value)}
+                  suggestions={[
+                    { label: "N — Nil", value: "N" },
+                    { label: "A — Mode A", value: "A" },
+                    { label: "C — Mode A+C", value: "C" },
+                    { label: "E — Mode S", value: "E" },
+                    { label: "B1 — ADS-B Out", value: "B1" },
+                    { label: "B2 — ADS-B In/Out", value: "B2" },
+                  ]}
+                  placeholder="Ej: N, C, E..."
+                />
+              </FieldWrapper>
+            </>
+          )}
 
-            <FieldRow label="Equipo de supervivencia" required={false}>
-              <CheckboxGroup
-                value={form.survival_equipment}
-                options={SURVIVAL_EQUIPMENT_OPTIONS}
-                onChange={(value) => updateField("survival_equipment", value)}
-              />
-            </FieldRow>
+          {step === 4 && (
+            <>
+              <FieldWrapper label="Capacidades PBN" required={false}>
+                <TagInput
+                  value={form.pbn_capabilities}
+                  onChange={(value) => updateField("pbn_capabilities", value)}
+                  suggestions={[
+                    { label: "A1 — RNP 10", value: "A1" },
+                    { label: "B1 — RNAV 5", value: "B1" },
+                    { label: "C1 — RNAV 2", value: "C1" },
+                    { label: "D1 — RNAV 1", value: "D1" },
+                    { label: "S1 — RNP APCH", value: "S1" },
+                    { label: "S2 — RNP APCH Baro", value: "S2" },
+                  ]}
+                  placeholder="Ej: A1, B1, C1..."
+                />
+              </FieldWrapper>
 
-            <FieldRow label="Chalecos salvavidas" required={false}>
-              <CheckboxGroup
-                value={form.life_jackets}
-                options={LIFE_JACKETS_OPTIONS}
-                onChange={(value) => updateField("life_jackets", value)}
-              />
-            </FieldRow>
-          </CardContent>
-        </Card>
+              <FieldWrapper label="Radio de emergencia" required={false}>
+                <SelectablePills
+                  value={form.emergency_radio}
+                  options={EMERGENCY_RADIO_OPTIONS}
+                  onChange={(value) => updateField("emergency_radio", value)}
+                />
+              </FieldWrapper>
 
-        {/* ── Botes salvavidas ── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Botes salvavidas</CardTitle>
-          </CardHeader>
-          <CardContent className="gap-4">
-            <Switch
-              value={form.has_dinghies}
-              onChange={(value) => updateField("has_dinghies", value)}
-              label="¿Lleva botes a bordo?"
-            />
+              <FieldWrapper label="Equipo de supervivencia" required={false}>
+                <SelectablePills
+                  value={form.survival_equipment}
+                  options={SURVIVAL_EQUIPMENT_OPTIONS}
+                  onChange={(value) => updateField("survival_equipment", value)}
+                />
+              </FieldWrapper>
 
-            {form.has_dinghies && (
-              <View className="gap-4">
-                <FieldRow label="Cantidad" required={false}>
-                  <Input
-                    value={form.dinghies_number}
-                    onChangeText={(text) => updateField("dinghies_number", text)}
-                    placeholder="Número de botes"
-                    keyboardType="number-pad"
-                  />
-                </FieldRow>
+              <FieldWrapper label="Chalecos salvavidas" required={false}>
+                <SelectablePills
+                  value={form.life_jackets}
+                  options={LIFE_JACKETS_OPTIONS}
+                  onChange={(value) => updateField("life_jackets", value)}
+                />
+              </FieldWrapper>
+            </>
+          )}
 
-                <FieldRow label="Capacidad" required={false}>
-                  <Input
-                    value={form.dinghies_capacity}
-                    onChangeText={(text) => updateField("dinghies_capacity", text)}
-                    placeholder="Capacidad total de personas"
-                    keyboardType="number-pad"
-                  />
-                </FieldRow>
+          {step === 5 && (
+            <>
+              <FieldWrapper label="URL de imagen" required={false}>
+                <Input
+                  value={form.image_url}
+                  onChangeText={(text) => updateField("image_url", text)}
+                  placeholder="https://ejemplo.com/foto-aeronave.jpg"
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  className="bg-zinc-50 rounded-2xl border-zinc-200 h-14"
+                />
+              </FieldWrapper>
 
-                <FieldRow label="Color" required={false}>
-                  <Input
-                    value={form.dinghies_color}
-                    onChangeText={(text) => updateField("dinghies_color", text)}
-                    placeholder="Color de los botes"
-                    maxLength={40}
-                  />
-                </FieldRow>
-
+              <View className="mt-2">
                 <Switch
-                  value={form.dinghies_cover}
-                  onChange={(value) => updateField("dinghies_cover", value)}
-                  label="Cubierta"
+                  value={form.has_dinghies}
+                  onChange={(value) => updateField("has_dinghies", value)}
+                  label="¿Lleva botes salvavidas?"
                 />
               </View>
-            )}
-          </CardContent>
-        </Card>
 
-        <Button
-          onPress={handleSubmit}
-          disabled={!isValid || isLoading}
-          className="mt-2"
-        >
-          <Text className="text-primary-foreground font-semibold">
-            {isLoading ? "Guardando..." : submitLabel}
-          </Text>
-        </Button>
+              {form.has_dinghies && (
+                <View className="gap-4 mt-2">
+                  <FieldWrapper label="Cantidad" required={false}>
+                    <StepperControl
+                      value={form.dinghies_number}
+                      onChange={(value) => updateField("dinghies_number", value)}
+                      min={0}
+                      max={20}
+                    />
+                  </FieldWrapper>
+
+                  <FieldWrapper label="Capacidad (personas)" required={false}>
+                    <StepperControl
+                      value={form.dinghies_capacity}
+                      onChange={(value) => updateField("dinghies_capacity", value)}
+                      min={0}
+                      max={100}
+                    />
+                  </FieldWrapper>
+
+                  <FieldWrapper label="Color" required={false}>
+                    <Input
+                      value={form.dinghies_color}
+                      onChangeText={(text) => updateField("dinghies_color", text)}
+                      placeholder="Color de los botes"
+                      maxLength={40}
+                      className="bg-zinc-50 rounded-2xl border-zinc-200 h-14"
+                    />
+                  </FieldWrapper>
+
+                  <Switch
+                    value={form.dinghies_cover}
+                    onChange={(value) => updateField("dinghies_cover", value)}
+                    label="Cubierta"
+                  />
+                </View>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* Navigation Buttons */}
+        <View className="px-4 mt-8 gap-3">
+          <Button
+            onPress={goNext}
+            disabled={!isStepValid || isLoading}
+            className="h-14 rounded-2xl"
+          >
+            <View className="flex-row items-center gap-2">
+              <Text className="text-primary-foreground font-semibold text-base">
+                {step === TOTAL_STEPS
+                  ? isLoading
+                    ? "Guardando..."
+                    : submitLabel
+                  : "Continuar"}
+              </Text>
+              {step < TOTAL_STEPS && (
+                <ChevronRight size={18} color="#ffffff" />
+              )}
+            </View>
+          </Button>
+
+          {step > 1 && (
+            <Button
+              variant="ghost"
+              onPress={goBack}
+              className="h-12"
+            >
+              <View className="flex-row items-center gap-2">
+                <ChevronLeft size={18} color="#71717a" />
+                <Text className="text-zinc-500 font-medium">Atrás</Text>
+              </View>
+            </Button>
+          )}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

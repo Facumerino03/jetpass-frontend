@@ -11,6 +11,7 @@ import type { AircraftPublic, AircraftUpdate } from "@/features/aircraft/types";
 import { getErrorMessage } from "@/lib/api";
 import { ChevronLeft, Pencil, Trash2, Plane } from "lucide-react-native";
 import { Alert } from "react-native";
+import { Image } from "expo-image";
 
 function DetailField({ label, value }: { label: string; value?: string | number | boolean | null }) {
   const displayValue =
@@ -193,6 +194,7 @@ export default function AircraftDetailScreen() {
             dinghies_capacity: aircraft.dinghies_capacity?.toString() ?? "",
             dinghies_cover: aircraft.dinghies_cover ?? false,
             dinghies_color: aircraft.dinghies_color ?? "",
+            image_url: aircraft.image_url ?? "",
           }}
           onSubmit={handleUpdate}
           submitLabel="Guardar cambios"
@@ -226,10 +228,19 @@ export default function AircraftDetailScreen() {
         contentContainerClassName="gap-4 p-4 pb-8"
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} />}
       >
-        <View className="items-center gap-2 py-4">
-          <View className="bg-primary/10 h-16 w-16 items-center justify-center rounded-full">
-            <Plane className="text-primary size-8" />
-          </View>
+        <View className="items-center gap-3 py-4">
+          {aircraft.image_url ? (
+            <Image
+              source={{ uri: aircraft.image_url }}
+              style={{ width: 200, height: 120 }}
+              contentFit="contain"
+              transition={200}
+            />
+          ) : (
+            <View className="bg-primary/10 h-20 w-20 items-center justify-center rounded-full">
+              <Plane className="text-primary size-10" />
+            </View>
+          )}
           <Text className="text-foreground text-xl font-bold">
             {aircraft.alias ?? aircraft.identification}
           </Text>
@@ -247,6 +258,7 @@ export default function AircraftDetailScreen() {
             <DetailField label="Designador ICAO" value={aircraft.icao_type_designator} />
             <DetailField label="Categoría de turbulencia" value={aircraft.wake_turbulence_category} />
             <DetailField label="Colores y marcas" value={aircraft.color_and_markings} />
+            <DetailField label="URL de imagen" value={aircraft.image_url} />
           </CardContent>
         </Card>
 
