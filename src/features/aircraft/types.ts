@@ -62,11 +62,11 @@ export interface AircraftCreate {
   dinghies_present?: boolean | null;
   dinghies_cover_present?: boolean | null;
   dinghies_color?: string | null;
-  image_url?: string | null;
+  image_key?: string | null;
 }
 
 export type AircraftUpdate = Partial<Omit<AircraftCreate, "identification" | "icao_type_designator" | "wake_turbulence_category" | "equipment_com_nav" | "equipment_surveillance" | "color_and_markings">> &
-  Partial<Pick<AircraftCreate, "identification" | "icao_type_designator" | "wake_turbulence_category" | "equipment_com_nav" | "equipment_surveillance" | "color_and_markings" | "image_url">>;
+  Partial<Pick<AircraftCreate, "identification" | "icao_type_designator" | "wake_turbulence_category" | "equipment_com_nav" | "equipment_surveillance" | "color_and_markings" | "image_key">>;
 
 export interface AircraftDeleteResponse {
   deleted: boolean;

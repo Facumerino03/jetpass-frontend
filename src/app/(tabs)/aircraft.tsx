@@ -1,6 +1,6 @@
 import * as React from "react";
 import { View, FlatList, RefreshControl } from "react-native";
-import { router, type Href } from "expo-router";
+import { router, useFocusEffect, type Href } from "expo-router";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/header";
@@ -36,6 +36,7 @@ export default function AircraftListScreen() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const hasInitialLoad = React.useRef(false);
 
   const fetchAircraft = React.useCallback(async () => {
     if (!session) return;
@@ -62,8 +63,18 @@ export default function AircraftListScreen() {
   }, [fetchAircraft]);
 
   React.useEffect(() => {
-    load();
+    load().then(() => {
+      hasInitialLoad.current = true;
+    });
   }, [load]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (hasInitialLoad.current) {
+        void fetchAircraft();
+      }
+    }, [fetchAircraft]),
+  );
 
   const handleDelete = React.useCallback(
     (aircraftItem: AircraftPublic) => {

@@ -1,11 +1,14 @@
 import * as React from "react";
-import { View, ScrollView, KeyboardAvoidingView, Platform, Pressable } from "react-native";
+import { View, ScrollView, KeyboardAvoidingView, Platform, Pressable, Alert } from "react-native";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { Text } from "@/components/ui/text";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { requestAircraftImagePresign, uploadAircraftImage } from "./aircraft-api";
 import type { AircraftCreate, AircraftUpdate, WakeTurbulenceCat } from "./types";
 import { WAKE_TURBULENCE_OPTIONS } from "./types";
 import {
@@ -17,6 +20,8 @@ import {
   Anchor,
   ChevronLeft,
   ChevronRight,
+  Camera,
+  X,
 } from "lucide-react-native";
 
 /* ─────────────────── Multi-select options ─────────────────── */
@@ -118,9 +123,12 @@ export type AircraftFormData = {
   dinghies_cover: boolean;
   dinghies_color: string;
   image_url: string;
+  image_uri: string | null;
+  image_mime_type: string | null;
 };
 
 interface AircraftFormProps {
+  accessToken: string;
   initialData?: Partial<AircraftFormData>;
   onSubmit: (data: AircraftCreate | AircraftUpdate) => void;
   submitLabel: string;
@@ -154,10 +162,12 @@ function toFormData(partial?: Partial<AircraftFormData>): AircraftFormData {
     dinghies_cover: partial?.dinghies_cover ?? false,
     dinghies_color: partial?.dinghies_color ?? "",
     image_url: partial?.image_url ?? "",
+    image_uri: partial?.image_uri ?? null,
+    image_mime_type: partial?.image_mime_type ?? null,
   };
 }
 
-function fromFormData(data: AircraftFormData): AircraftCreate {
+function fromFormData(data: AircraftFormData, imageKey: string | null): AircraftCreate {
   const emergencySelected = parseValue(data.emergency_radio);
   const survivalSelected = parseValue(data.survival_equipment);
   const lifeJacketSelected = parseValue(data.life_jackets);
@@ -199,7 +209,7 @@ function fromFormData(data: AircraftFormData): AircraftCreate {
           dinghies_cover_present: false,
           dinghies_color: null,
         }),
-    image_url: data.image_url.trim() || null,
+    ...(imageKey !== null ? { image_key: imageKey } : {}),
   };
 }
 
@@ -519,9 +529,10 @@ function FieldWrapper({
 
 /* ─────────────────── Component ─────────────────── */
 
-export function AircraftForm({ initialData, onSubmit, submitLabel, isLoading }: AircraftFormProps) {
+export function AircraftForm({ accessToken, initialData, onSubmit, submitLabel, isLoading }: AircraftFormProps) {
   const [form, setForm] = React.useState<AircraftFormData>(() => toFormData(initialData));
   const [step, setStep] = React.useState(1);
+  const [isImageUploading, setIsImageUploading] = React.useState(false);
 
   const updateField = React.useCallback(<K extends keyof AircraftFormData>(
     field: K,
@@ -530,9 +541,52 @@ export function AircraftForm({ initialData, onSubmit, submitLabel, isLoading }: 
     setForm((prev) => ({ ...prev, [field]: value }));
   }, []);
 
-  const handleSubmit = React.useCallback(() => {
-    onSubmit(fromFormData(form));
-  }, [form, onSubmit]);
+  const pickImage = React.useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permiso requerido", "Necesitamos acceso a la galería para seleccionar una imagen.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0];
+      updateField("image_uri", asset.uri);
+      updateField("image_mime_type", asset.mimeType ?? "image/jpeg");
+    }
+  }, [updateField]);
+
+  const clearImage = React.useCallback(() => {
+    updateField("image_uri", null);
+    updateField("image_mime_type", null);
+    updateField("image_url", "");
+  }, [updateField]);
+
+  const handleSubmit = React.useCallback(async () => {
+    setIsImageUploading(true);
+    try {
+      let imageKey: string | null = null;
+
+      if (form.image_uri && form.image_mime_type) {
+        const presign = await requestAircraftImagePresign(accessToken, form.image_mime_type);
+        await uploadAircraftImage(presign.upload_url, form.image_uri, form.image_mime_type);
+        imageKey = presign.image_key;
+      }
+
+      await onSubmit(fromFormData(form, imageKey));
+    } catch (err) {
+      Alert.alert("Error al subir imagen", err instanceof Error ? err.message : "No se pudo subir la imagen.");
+      throw err;
+    } finally {
+      setIsImageUploading(false);
+    }
+  }, [accessToken, form, onSubmit]);
 
   const isStepValid = React.useMemo(() => {
     switch (step) {
@@ -557,11 +611,11 @@ export function AircraftForm({ initialData, onSubmit, submitLabel, isLoading }: 
     }
   }, [step, form]);
 
-  const goNext = React.useCallback(() => {
+  const goNext = React.useCallback(async () => {
     if (step < TOTAL_STEPS) {
       setStep((s) => s + 1);
     } else {
-      handleSubmit();
+      await handleSubmit();
     }
   }, [step, handleSubmit]);
 
@@ -730,15 +784,38 @@ export function AircraftForm({ initialData, onSubmit, submitLabel, isLoading }: 
 
           {step === 5 && (
             <>
-              <FieldWrapper label="URL de imagen" required={false}>
-                <Input
-                  value={form.image_url}
-                  onChangeText={(text) => updateField("image_url", text)}
-                  placeholder="https://ejemplo.com/foto-aeronave.jpg"
-                  keyboardType="url"
-                  autoCapitalize="none"
-                  className="bg-zinc-50 rounded-2xl border-zinc-200 h-14"
-                />
+              <FieldWrapper label="Foto de la aeronave" required={false}>
+                <View className="gap-3">
+                  <Pressable
+                    onPress={pickImage}
+                    disabled={isImageUploading}
+                    className="items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 active:bg-zinc-100"
+                    style={{ height: 180 }}
+                  >
+                    {form.image_uri || form.image_url ? (
+                      <Image
+                        source={{ uri: form.image_uri ?? form.image_url }}
+                        style={{ width: "100%", height: "100%" }}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View className="items-center gap-2">
+                        <Camera size={32} color="#a1a1aa" />
+                        <Text className="text-sm text-zinc-400">Tocá para seleccionar una imagen</Text>
+                      </View>
+                    )}
+                  </Pressable>
+
+                  {(form.image_uri || form.image_url) && (
+                    <Pressable
+                      onPress={clearImage}
+                      className="flex-row items-center justify-center gap-1 self-start rounded-full bg-zinc-100 px-3 py-1.5 active:bg-zinc-200"
+                    >
+                      <X size={14} color="#3f3f46" />
+                      <Text className="text-xs font-medium text-zinc-600">Quitar imagen</Text>
+                    </Pressable>
+                  )}
+                </View>
               </FieldWrapper>
 
               <View className="mt-2">
@@ -794,13 +871,13 @@ export function AircraftForm({ initialData, onSubmit, submitLabel, isLoading }: 
         <View className="px-4 mt-8 gap-3">
           <Button
             onPress={goNext}
-            disabled={!isStepValid || isLoading}
+            disabled={!isStepValid || isLoading || isImageUploading}
             className="h-14 rounded-2xl"
           >
             <View className="flex-row items-center gap-2">
               <Text className="text-primary-foreground font-semibold text-base">
                 {step === TOTAL_STEPS
-                  ? isLoading
+                  ? isLoading || isImageUploading
                     ? "Guardando..."
                     : submitLabel
                   : "Continuar"}

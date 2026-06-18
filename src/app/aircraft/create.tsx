@@ -59,6 +59,7 @@ export default function CreateAircraftScreen() {
       </View>
 
       <AircraftForm
+        accessToken={session?.access_token ?? ""}
         onSubmit={handleSubmit}
         submitLabel="Crear aeronave"
         isLoading={isSubmitting}

@@ -678,7 +678,8 @@ export function AircraftFplConfirmSheet({
   const handleStartEdit = React.useCallback(
     (item: FplFieldItem) => {
       if (!item.fieldKey) return;
-      const raw = fields[item.fieldKey] ?? "";
+      const raw = fields[item.fieldKey];
+      if (typeof raw !== "string") return;
       setEditingId(item.id);
       setDraftValue(raw);
       unconfirm(item.id);

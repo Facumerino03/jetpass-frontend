@@ -177,6 +177,7 @@ export default function AircraftDetailScreen() {
         </View>
 
         <AircraftForm
+          accessToken={session?.access_token ?? ""}
           initialData={{
             identification: aircraft.identification,
             icao_type_designator: aircraft.icao_type_designator,
