@@ -293,10 +293,10 @@ La elección de no usar Axios es una decisión de ingeniería deliberada. Axios 
 "react-native-maps": "^1.27.2"
 ```
 
-Configuración en `app.json`:
+Configuración en `app.json` (la key se inyecta desde `.env` vía `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`):
 ```json
 ["react-native-maps", {
-  "androidGoogleMapsApiKey": "AIzaSyAtPsCR9qw0VUfOI_99Gkirgfy01fulAuw"
+  "androidGoogleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
 }]
 ```
 
@@ -604,7 +604,7 @@ La rotación automática de tokens con un buffer de 30 segundos antes del vencim
 
 ### Protección de API Keys
 
-Las keys de APIs externas (Google Maps, OpenWeatherMap) se gestionan a través de variables de entorno. El prefijo `EXPO_PUBLIC_` en `EXPO_PUBLIC_OWM_API_KEY` indica que la variable es intencionalmente expuesta al cliente (es un patrón estándar en Expo/Next.js para distinguir secretos de servidor de keys públicas). La API key de Google Maps se incluye en `app.json` directamente porque el SDK nativo de Android la requiere en tiempo de build dentro del `AndroidManifest.xml`.
+Las keys de APIs externas (Google Maps, OpenWeatherMap) se gestionan a través de variables de entorno en `.env` (nunca commiteadas). El prefijo `EXPO_PUBLIC_` indica que la variable es intencionalmente expuesta al cliente (patrón estándar en Expo para distinguir secretos de servidor de keys públicas). En `app.json`, `react-native-maps` referencia `${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`; Expo la resuelve en tiempo de build e inyecta el valor en `AndroidManifest.xml`. Ver `.env.example` para las variables requeridas.
 
 ### No hay secretos de servidor en el cliente
 

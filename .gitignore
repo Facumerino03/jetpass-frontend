@@ -31,7 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local
+.env*
+!.env.example
 
 # typescript
 *.tsbuildinfo
@@ -52,5 +53,3 @@ app-example
 jetpass-frontend.code-workspace
 
 .superpowers/
-.env
-
