@@ -4,6 +4,7 @@ import {
   getCurrentUser,
   loginPilot,
   logoutPilot,
+  refreshAuthSession,
   registerPilot,
 } from "./auth-api";
 import {
@@ -12,6 +13,8 @@ import {
   writeStoredSession,
 } from "./session-storage";
 import type { AuthSession, PilotRegisterRequest, UserPublic } from "./types";
+
+const REFRESH_BUFFER_MS = 30_000;
 
 type AuthContextValue = {
   isLoading: boolean;
@@ -25,6 +28,24 @@ type AuthContextValue = {
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 let globalLogoutInProgress = false;
+
+function toAuthSession(response: Omit<AuthSession, "expires_at">): AuthSession {
+  return {
+    ...response,
+    expires_at: Date.now() + response.expires_in * 1000,
+  };
+}
+
+function getRefreshDelay(session: AuthSession) {
+  const expiresInMs = session.expires_in * 1000;
+  const buffer = Math.min(REFRESH_BUFFER_MS, Math.max(1_000, expiresInMs / 2));
+
+  return Math.max(1_000, session.expires_at - Date.now() - buffer);
+}
+
+function shouldRefreshSession(session: AuthSession) {
+  return session.expires_at - Date.now() <= REFRESH_BUFFER_MS;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = React.useState(true);
@@ -51,8 +72,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-          const user = await getCurrentUser(storedSession.access_token);
-          const nextSession = { ...storedSession, user };
+          let validSession = storedSession;
+
+          if (!validSession.expires_at || shouldRefreshSession(validSession)) {
+            const refreshedSession = await refreshAuthSession({
+              refresh_token: validSession.refresh_token,
+            });
+            validSession = toAuthSession(refreshedSession);
+          }
+
+          const user = await getCurrentUser(validSession.access_token);
+          const nextSession = { ...validSession, user };
           await writeStoredSession(nextSession);
           if (isMounted) setSession(nextSession);
         } catch (error) {
@@ -74,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = React.useCallback(
     async (input: { email: string; password: string }) => {
-      const nextSession = await loginPilot(input);
+      const nextSession = toAuthSession(await loginPilot(input));
       await writeStoredSession(nextSession);
       setSession(nextSession);
     },
@@ -83,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = React.useCallback(
     async (input: Omit<PilotRegisterRequest, "device_name">) => {
-      const nextSession = await registerPilot(input);
+      const nextSession = toAuthSession(await registerPilot(input));
       await writeStoredSession(nextSession);
       setSession(nextSession);
     },
@@ -125,6 +155,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       globalLogoutInProgress = false;
     }
+  }, [session]);
+
+  React.useEffect(() => {
+    if (!session?.refresh_token) return;
+
+    const timeout = setTimeout(async () => {
+      try {
+        console.log("[Auth] Refreshing access token...");
+        const refreshedSession = toAuthSession(
+          await refreshAuthSession({ refresh_token: session.refresh_token }),
+        );
+        await writeStoredSession(refreshedSession);
+        setSession(refreshedSession);
+        console.log("[Auth] Access token refreshed");
+      } catch (error) {
+        console.log("[Auth] Token refresh failed, clearing session:", error);
+        await clearStoredSession();
+        setSession(null);
+      }
+    }, getRefreshDelay(session));
+
+    return () => clearTimeout(timeout);
   }, [session]);
 
   const value = React.useMemo<AuthContextValue>(

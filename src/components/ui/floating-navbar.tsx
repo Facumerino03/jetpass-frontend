@@ -41,6 +41,11 @@ export default function FloatingNavbar({
   const router = useRouter();
 
   const activeRouteName = state.routes[state.index]?.name as string;
+
+  if (activeRouteName === "create-fpl") {
+    return null;
+  }
+
   const fabConfig = FAB_CONFIG[activeRouteName];
 
   const handleFabPress = () => {

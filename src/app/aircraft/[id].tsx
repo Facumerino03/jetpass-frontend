@@ -186,13 +186,27 @@ export default function AircraftDetailScreen() {
             color_and_markings: aircraft.color_and_markings,
             alias: aircraft.alias ?? "",
             pbn_capabilities: aircraft.pbn_capabilities ?? "",
-            emergency_radio: aircraft.emergency_radio ?? "",
-            survival_equipment: aircraft.survival_equipment ?? "",
-            life_jackets: aircraft.life_jackets ?? "",
-            has_dinghies: undefined,
+            emergency_radio: [
+              aircraft.emergency_radio_uhf && "UHF",
+              aircraft.emergency_radio_vhf && "VHF",
+              aircraft.emergency_radio_elt && "ELT",
+            ].filter(Boolean).join(", "),
+            survival_equipment: [
+              aircraft.survival_polar && "Polar",
+              aircraft.survival_desert && "Desert",
+              aircraft.survival_maritime && "Maritime",
+              aircraft.survival_jungle && "Jungle",
+            ].filter(Boolean).join(", "),
+            life_jackets: [
+              aircraft.life_jackets_lights && "Light",
+              aircraft.life_jackets_fluorescein && "Fluorescent",
+              aircraft.life_jackets_uhf && "UHF",
+              aircraft.life_jackets_vhf && "VHF",
+            ].filter(Boolean).join(", "),
+            has_dinghies: aircraft.dinghies_present ?? false,
             dinghies_number: aircraft.dinghies_number?.toString() ?? "",
             dinghies_capacity: aircraft.dinghies_capacity?.toString() ?? "",
-            dinghies_cover: aircraft.dinghies_cover ?? false,
+            dinghies_cover: aircraft.dinghies_cover_present ?? false,
             dinghies_color: aircraft.dinghies_color ?? "",
             image_url: aircraft.image_url ?? "",
           }}
@@ -278,9 +292,32 @@ export default function AircraftDetailScreen() {
             <CardTitle className="text-base">Equipamiento de emergencia</CardTitle>
           </CardHeader>
           <CardContent className="gap-3">
-            <DetailListField label="Radio de emergencia" value={aircraft.emergency_radio} />
-            <DetailListField label="Equipo de supervivencia" value={aircraft.survival_equipment} />
-            <DetailListField label="Chalecos salvavidas" value={aircraft.life_jackets} />
+            <DetailListField
+              label="Radio de emergencia"
+              value={[
+                aircraft.emergency_radio_uhf && "UHF",
+                aircraft.emergency_radio_vhf && "VHF",
+                aircraft.emergency_radio_elt && "ELT",
+              ].filter(Boolean).join(", ") || null}
+            />
+            <DetailListField
+              label="Equipo de supervivencia"
+              value={[
+                aircraft.survival_polar && "Polar",
+                aircraft.survival_desert && "Desierto",
+                aircraft.survival_maritime && "Marítimo",
+                aircraft.survival_jungle && "Jungla",
+              ].filter(Boolean).join(", ") || null}
+            />
+            <DetailListField
+              label="Chalecos salvavidas"
+              value={[
+                aircraft.life_jackets_lights && "Luces",
+                aircraft.life_jackets_fluorescein && "Fluorescína",
+                aircraft.life_jackets_uhf && "UHF",
+                aircraft.life_jackets_vhf && "VHF",
+              ].filter(Boolean).join(", ") || null}
+            />
           </CardContent>
         </Card>
 
@@ -289,13 +326,13 @@ export default function AircraftDetailScreen() {
             <CardTitle className="text-base">Botes salvavidas</CardTitle>
           </CardHeader>
           <CardContent className="gap-3">
-            {aircraft.dinghies_number === 0 && aircraft.dinghies_capacity === 0 && !aircraft.dinghies_cover && !aircraft.dinghies_color ? (
+            {!aircraft.dinghies_present && !aircraft.dinghies_number && !aircraft.dinghies_capacity && !aircraft.dinghies_cover_present && !aircraft.dinghies_color ? (
               <Text className="text-muted-foreground text-base">No lleva botes a bordo</Text>
             ) : (
               <>
                 <DetailField label="Cantidad" value={aircraft.dinghies_number} />
                 <DetailField label="Capacidad" value={aircraft.dinghies_capacity} />
-                <DetailField label="Cubierta" value={aircraft.dinghies_cover} />
+                <DetailField label="Cubierta" value={aircraft.dinghies_cover_present} />
                 <DetailField label="Color" value={aircraft.dinghies_color} />
               </>
             )}

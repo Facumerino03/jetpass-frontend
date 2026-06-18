@@ -12,6 +12,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="aircraft" />
       <Tabs.Screen name="plans" />
+      <Tabs.Screen name="create-fpl" options={{ href: null }} />
       <Tabs.Screen name="more" />
     </Tabs>
   );

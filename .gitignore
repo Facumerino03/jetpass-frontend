@@ -52,4 +52,5 @@ app-example
 jetpass-frontend.code-workspace
 
 .superpowers/
+.env
 

@@ -34,4 +34,10 @@ export type AuthTokenResponse = {
   user: UserPublic;
 };
 
-export type AuthSession = AuthTokenResponse;
+export type RefreshRequest = {
+  refresh_token: string;
+};
+
+export type AuthSession = AuthTokenResponse & {
+  expires_at: number;
+};

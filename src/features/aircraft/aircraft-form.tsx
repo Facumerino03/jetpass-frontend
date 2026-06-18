@@ -91,6 +91,8 @@ const SURVIVAL_EQUIPMENT_OPTIONS = [
 const LIFE_JACKETS_OPTIONS = [
   { label: "Light", value: "Light" },
   { label: "Fluorescent", value: "Fluorescent" },
+  { label: "UHF", value: "UHF" },
+  { label: "VHF", value: "VHF" },
 ];
 
 /* ─────────────────── Form types & helpers ─────────────────── */
@@ -104,8 +106,11 @@ export type AircraftFormData = {
   color_and_markings: string;
   alias: string;
   pbn_capabilities: string;
+  /** Comma-separated active values: "UHF", "VHF", "ELT" */
   emergency_radio: string;
+  /** Comma-separated active values: "Polar", "Desert", "Maritime", "Jungle" */
   survival_equipment: string;
+  /** Comma-separated active values: "Light", "Fluorescent", "UHF", "VHF" */
   life_jackets: string;
   has_dinghies: boolean;
   dinghies_number: string;
@@ -153,6 +158,10 @@ function toFormData(partial?: Partial<AircraftFormData>): AircraftFormData {
 }
 
 function fromFormData(data: AircraftFormData): AircraftCreate {
+  const emergencySelected = parseValue(data.emergency_radio);
+  const survivalSelected = parseValue(data.survival_equipment);
+  const lifeJacketSelected = parseValue(data.life_jackets);
+
   return {
     identification: data.identification.trim(),
     icao_type_designator: data.icao_type_designator.trim().toUpperCase(),
@@ -162,20 +171,32 @@ function fromFormData(data: AircraftFormData): AircraftCreate {
     color_and_markings: data.color_and_markings.trim(),
     alias: data.alias.trim() || null,
     pbn_capabilities: data.pbn_capabilities.trim() || null,
-    emergency_radio: data.emergency_radio.trim() || null,
-    survival_equipment: data.survival_equipment.trim() || null,
-    life_jackets: data.life_jackets.trim() || null,
+    emergency_radio_uhf: emergencySelected.includes("UHF"),
+    emergency_radio_vhf: emergencySelected.includes("VHF"),
+    emergency_radio_elt: emergencySelected.includes("ELT"),
+    survival_equipment_present: survivalSelected.length > 0,
+    survival_polar: survivalSelected.includes("Polar"),
+    survival_desert: survivalSelected.includes("Desert"),
+    survival_maritime: survivalSelected.includes("Maritime"),
+    survival_jungle: survivalSelected.includes("Jungle"),
+    life_jackets_present: lifeJacketSelected.length > 0,
+    life_jackets_lights: lifeJacketSelected.includes("Light"),
+    life_jackets_fluorescein: lifeJacketSelected.includes("Fluorescent"),
+    life_jackets_uhf: lifeJacketSelected.includes("UHF"),
+    life_jackets_vhf: lifeJacketSelected.includes("VHF"),
     ...(data.has_dinghies
       ? {
           dinghies_number: data.dinghies_number ? parseInt(data.dinghies_number, 10) : 0,
           dinghies_capacity: data.dinghies_capacity ? parseInt(data.dinghies_capacity, 10) : 0,
-          dinghies_cover: data.dinghies_cover,
+          dinghies_present: true,
+          dinghies_cover_present: data.dinghies_cover,
           dinghies_color: data.dinghies_color.trim() || null,
         }
       : {
           dinghies_number: 0,
           dinghies_capacity: 0,
-          dinghies_cover: false,
+          dinghies_present: false,
+          dinghies_cover_present: false,
           dinghies_color: null,
         }),
     image_url: data.image_url.trim() || null,

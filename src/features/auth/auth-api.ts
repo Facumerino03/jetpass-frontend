@@ -4,6 +4,7 @@ import type {
   AuthTokenResponse,
   LoginRequest,
   PilotRegisterRequest,
+  RefreshRequest,
   UserPublic,
 } from "./types";
 
@@ -34,6 +35,13 @@ export function registerPilot(
 export function getCurrentUser(accessToken: string) {
   return apiRequest<UserPublic>("/auth/me", {
     accessToken,
+  });
+}
+
+export function refreshAuthSession(input: RefreshRequest) {
+  return apiRequest<AuthTokenResponse>("/auth/refresh", {
+    method: "POST",
+    body: input,
   });
 }
 
