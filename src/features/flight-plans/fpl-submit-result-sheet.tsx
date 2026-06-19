@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ActivityIndicator, Modal, Pressable, View } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlertTriangle, Check, Send } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ type FplSubmitResultSheetProps = {
   phase: FplSubmitSheetPhase;
   status?: FlightPlanStatus | null;
   errorMessage?: string | null;
+  officialPdfUrl?: string | null;
   onRetry: () => void;
   onGoHome: () => void;
   onClose: () => void;
@@ -54,12 +56,22 @@ export function FplSubmitResultSheet({
   phase,
   status,
   errorMessage,
+  officialPdfUrl,
   onRetry,
   onGoHome,
   onClose,
 }: FplSubmitResultSheetProps) {
   const insets = useSafeAreaInsets();
   const success = successCopy(status);
+
+  const handleDownloadPdf = React.useCallback(async () => {
+    if (!officialPdfUrl) return;
+    try {
+      await WebBrowser.openBrowserAsync(officialPdfUrl);
+    } catch {
+      // ignore
+    }
+  }, [officialPdfUrl]);
 
   return (
     <Modal
@@ -112,6 +124,13 @@ export function FplSubmitResultSheet({
               <Text className="mt-2 text-center text-sm leading-relaxed text-zinc-600">
                 {success.description}
               </Text>
+              {officialPdfUrl ? (
+                <Pressable onPress={handleDownloadPdf} className="mt-4">
+                  <Text className="text-center text-sm font-semibold text-primary underline underline-offset-4">
+                    Descargar archivo PDF
+                  </Text>
+                </Pressable>
+              ) : null}
               <Button onPress={onGoHome} className="mt-8 h-14 w-full rounded-2xl">
                 <Text className="text-base font-semibold text-primary-foreground">
                   Volver al menú principal

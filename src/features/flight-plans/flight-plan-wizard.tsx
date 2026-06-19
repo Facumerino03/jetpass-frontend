@@ -10,6 +10,7 @@ import { getErrorMessage } from "@/lib/api";
 import { listAircraft } from "@/features/aircraft/aircraft-api";
 import type { AircraftPublic } from "@/features/aircraft/types";
 import { createFlightPlan, submitFlightPlan, updateFlightPlan } from "./flight-plan-api";
+import { FplSignatureSheet } from "./fpl-signature-sheet";
 import { FplSubmitResultSheet, type FplSubmitSheetPhase } from "./fpl-submit-result-sheet";
 import type { FlightPlanPublic, FlightPlanStatus, FlightRules, FlightType } from "./types";
 import { step1DataToFlightDateAndTime } from "./eobt-utils";
@@ -121,6 +122,8 @@ export function FlightPlanWizard({ accessToken }: FlightPlanWizardProps) {
     status: null,
     errorMessage: null,
   });
+  const [signatureSheetOpen, setSignatureSheetOpen] = React.useState(false);
+  const [officialPdfUrl, setOfficialPdfUrl] = React.useState<string | null>(null);
 
   const handleStep1Complete = React.useCallback(
     async (data: Step1Data) => {
@@ -321,15 +324,9 @@ export function FlightPlanWizard({ accessToken }: FlightPlanWizardProps) {
     }
   }, [accessToken, flightPlan, operationalStep]);
 
-  const submitCurrentFlightPlan = React.useCallback(async () => {
+  const handleOpenSignatureSheet = React.useCallback(async () => {
     if (!flightPlan) return;
     setError(null);
-    setSubmitSheet({
-      visible: true,
-      phase: "submitting",
-      status: null,
-      errorMessage: null,
-    });
     setIsSaving(true);
     try {
       if (otherInformation !== (flightPlan.other_information ?? "")) {
@@ -338,40 +335,47 @@ export function FlightPlanWizard({ accessToken }: FlightPlanWizardProps) {
         });
         setFlightPlan(updated);
       }
-      const result = await submitFlightPlan(accessToken, flightPlan.id);
+      setSignatureSheetOpen(true);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  }, [accessToken, flightPlan, otherInformation]);
+
+  const handleSignatureSuccess = React.useCallback(
+    (result: { id: string; status: FlightPlanStatus }, pdfUrl: string | null) => {
+      setSignatureSheetOpen(false);
+      setOfficialPdfUrl(pdfUrl);
       setSubmitSheet({
         visible: true,
         phase: "success",
         status: result.status,
         errorMessage: null,
       });
-    } catch (err) {
-      const message = getErrorMessage(err);
-      const lower = message.toLowerCase();
-      const needsOperationalFix =
-        lower.includes("endurance") || lower.includes("autonomia");
+    },
+    [],
+  );
 
-      if (needsOperationalFix) {
-        setSubmitSheet({
-          visible: false,
-          phase: "error",
-          status: null,
-          errorMessage: null,
-        });
-        setError(message);
-        setStep(6);
-      } else {
-        setSubmitSheet({
-          visible: true,
-          phase: "error",
-          status: null,
-          errorMessage: message,
-        });
-      }
-    } finally {
-      setIsSaving(false);
+  const handleSignatureError = React.useCallback((message: string) => {
+    setSignatureSheetOpen(false);
+    setOfficialPdfUrl(null);
+    const lower = message.toLowerCase();
+    const needsOperationalFix =
+      lower.includes("endurance") || lower.includes("autonomia");
+
+    if (needsOperationalFix) {
+      setError(message);
+      setStep(6);
+    } else {
+      setSubmitSheet({
+        visible: true,
+        phase: "error",
+        status: null,
+        errorMessage: message,
+      });
     }
-  }, [accessToken, flightPlan, otherInformation]);
+  }, []);
 
   const handleGoHome = React.useCallback(() => {
     setSubmitSheet({
@@ -380,6 +384,7 @@ export function FlightPlanWizard({ accessToken }: FlightPlanWizardProps) {
       status: null,
       errorMessage: null,
     });
+    setOfficialPdfUrl(null);
     router.replace("/(tabs)");
   }, []);
 
@@ -390,6 +395,7 @@ export function FlightPlanWizard({ accessToken }: FlightPlanWizardProps) {
       status: null,
       errorMessage: null,
     });
+    setOfficialPdfUrl(null);
   }, []);
 
   const handleClose = React.useCallback(() => {
@@ -435,7 +441,7 @@ export function FlightPlanWizard({ accessToken }: FlightPlanWizardProps) {
     } else if (step === 6) {
       void saveOperationalStep();
     } else if (step === 7) {
-      void submitCurrentFlightPlan();
+      void handleOpenSignatureSheet();
     }
   }, [
     step,
@@ -445,7 +451,7 @@ export function FlightPlanWizard({ accessToken }: FlightPlanWizardProps) {
     saveRouteStep,
     saveFlightStep,
     saveOperationalStep,
-    submitCurrentFlightPlan,
+    handleOpenSignatureSheet,
     aircraftSheetOpen,
   ]);
 
@@ -735,12 +741,25 @@ export function FlightPlanWizard({ accessToken }: FlightPlanWizardProps) {
         onConfirm={() => void confirmAircraftStep()}
       />
 
+      <FplSignatureSheet
+        visible={signatureSheetOpen}
+        flightPlanId={flightPlan?.id ?? ""}
+        accessToken={accessToken}
+        onClose={() => setSignatureSheetOpen(false)}
+        onSubmitSuccess={handleSignatureSuccess}
+        onSubmitError={handleSignatureError}
+      />
+
       <FplSubmitResultSheet
         visible={submitSheet.visible}
         phase={submitSheet.phase}
         status={submitSheet.status}
         errorMessage={submitSheet.errorMessage}
-        onRetry={() => void submitCurrentFlightPlan()}
+        officialPdfUrl={officialPdfUrl}
+        onRetry={() => {
+          closeSubmitSheet();
+          void handleOpenSignatureSheet();
+        }}
         onGoHome={handleGoHome}
         onClose={closeSubmitSheet}
       />

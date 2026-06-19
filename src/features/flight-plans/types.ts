@@ -372,8 +372,7 @@ export interface FlightPlanUpdate {
   other_information?: string | null;
   endurance?: string | null;
   persons_on_board?: number | null;
-  remarks_present?: boolean | null;
-  remarks?: string | null;
+  signature_key?: string | null;
 }
 
 export interface FlightPlanPublic extends Required<FlightPlanCreate> {
@@ -420,6 +419,7 @@ export interface FlightPlanPublic extends Required<FlightPlanCreate> {
   remarks: string | null;
   pilot_in_command: string | null;
   signature_url: string | null;
+  official_pdf_url: string | null;
   created_at: string;
   updated_at: string;
 }
